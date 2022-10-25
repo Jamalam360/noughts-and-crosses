@@ -10,8 +10,10 @@ fn main() {
             resizable: false,
             ..default()
         })
-        .insert_resource(Turn(String::from("X")))
-        .insert_resource(Winner(false, String::from("")))
+        .insert_resource(State {
+            turn: String::from("X"),
+            winner: false,
+        })
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(update_current_player)
@@ -26,8 +28,10 @@ struct PlayerDisplay;
 #[derive(Debug, Component)]
 struct Position(isize, isize);
 
-struct Turn(String);
-struct Winner(bool, String);
+struct State {
+    turn: String,
+    winner: bool,
+}
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn().insert_bundle(Camera2dBundle::default());
@@ -70,35 +74,33 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn update_current_player(
-    turn: Res<Turn>,
-    winner: Res<Winner>,
+    state: Res<State>,
     mut query: Query<&mut Text, (With<Text>, With<PlayerDisplay>)>,
 ) {
     for mut text in &mut query {
         let str;
 
-        if winner.0 {
-            str = String::from(&winner.1.to_owned()) + " wins!";
+        if state.winner {
+            str = state.turn.to_owned() + " wins!";
         } else {
-            if turn.0 == "X" {
+            if state.turn == "X" {
                 str = String::from("Player 1's Turn (X)");
             } else {
                 str = String::from("Player 2's Turn (O)");
             }
         }
 
-        text.sections[0].value = String::from(str);
+        set_text(&mut text, &str);
     }
 }
 
 fn check_mouse_input(
-    winner: Res<Winner>,
-    mut windows: ResMut<Windows>,
-    mut turn: ResMut<Turn>,
     mouse_button_input: Res<Input<MouseButton>>,
+    mut windows: ResMut<Windows>,
+    mut state: ResMut<State>,
     mut query: Query<(&mut Text, &mut Position), (With<Text>, With<Position>)>,
 ) {
-    if winner.0 {
+    if state.winner {
         return;
     };
 
@@ -125,16 +127,8 @@ fn check_mouse_input(
                         for mut i in &mut query {
                             if i.1 .0 == row && i.1 .1 == col {
                                 if i.0.sections[0].value == "-" {
-                                    i.0.sections[0].value = turn.0.clone();
-                                    let next_turn;
-
-                                    if turn.0 == "X" {
-                                        next_turn = "O"
-                                    } else {
-                                        next_turn = "X";
-                                    }
-
-                                    turn.0 = String::from(next_turn);
+                                    set_text(&mut i.0, &state.turn);
+                                    state.turn = get_opposite_turn(&state.turn);
                                     break;
                                 }
                             }
@@ -149,9 +143,13 @@ fn check_mouse_input(
 }
 
 fn check_winner(
-    mut winner: ResMut<Winner>,
+    mut state: ResMut<State>,
     query: Query<(&mut Text, &mut Position), (With<Text>, With<Position>)>,
 ) {
+    if state.winner {
+        return;
+    }
+
     let mut board = [["-", "-", "-"], ["-", "-", "-"], ["-", "-", "-"]];
 
     for i in query.iter() {
@@ -160,7 +158,7 @@ fn check_winner(
 
     let mut cols: [[&str; 3]; 3] = [["-"; 3]; 3];
 
-    for col_number in 0..2 {
+    for col_number in 0..3 {
         cols[col_number] = [
             board[0][col_number],
             board[1][col_number],
@@ -176,9 +174,21 @@ fn check_winner(
 
     for line in [board, cols, diagonal_0, diagonal_1].concat() {
         if line[0] == line[1] && line[1] == line[2] && line[0] != "-" {
-            winner.0 = true;
-            winner.1 = String::from(line[0]);
+            state.winner = true;
+            state.turn = get_opposite_turn(&state.turn);
             break;
         }
     }
+}
+
+fn get_opposite_turn(turn: &String) -> String {
+    if turn == "X" {
+        String::from("O")
+    } else {
+        String::from("X")
+    }
+}
+
+fn set_text(text: &mut Mut<Text>, value: &String) {
+    text.sections[0].value = value.to_owned();
 }
