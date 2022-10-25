@@ -26,7 +26,10 @@ fn main() {
 struct PlayerDisplay;
 
 #[derive(Debug, Component)]
-struct Position(isize, isize);
+struct Position {
+    row: isize,
+    col: isize,
+}
 
 struct State {
     turn: String,
@@ -53,7 +56,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     transform: Transform::from_xyz((row * 120) as f32, (col * 120) as f32, 0.),
                     ..default()
                 })
-                .insert(Position(row, col));
+                .insert(Position { row, col });
         }
     }
 
@@ -125,7 +128,7 @@ fn check_mouse_input(
                         && pos.y < y_pos_max
                     {
                         for mut i in &mut query {
-                            if i.1 .0 == row && i.1 .1 == col {
+                            if i.1.row == row && i.1.col == col {
                                 if i.0.sections[0].value == "-" {
                                     set_text(&mut i.0, &state.turn);
                                     state.turn = get_opposite_turn(&state.turn);
@@ -153,7 +156,7 @@ fn check_winner(
     let mut board = [["-", "-", "-"], ["-", "-", "-"], ["-", "-", "-"]];
 
     for i in query.iter() {
-        board[2 - (i.1 .1 + 1) as usize][(i.1 .0 + 1) as usize] = &i.0.sections[0].value;
+        board[2 - (i.1.col + 1) as usize][(i.1.row + 1) as usize] = &i.0.sections[0].value;
     }
 
     let mut cols: [[&str; 3]; 3] = [["-"; 3]; 3];
